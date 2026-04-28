@@ -8,6 +8,7 @@ public class PlayerInputConnector : MonoBehaviour
     [SerializeField] private MovementSystem movementSystem; // Reference to movement logic
     [SerializeField] private TargetMarkerView targetMarkerView; // Optional: shows marker at target
     [SerializeField] private CombatModeSystem combatModeSystem; // Optional: handles combat mode switching
+    [SerializeField] private ShieldSystem shieldSystem; // Optional: handles shield recharge on mode switch
 
     // Handles input for movement and combat mode switching
     private void Update()
@@ -22,6 +23,10 @@ public class PlayerInputConnector : MonoBehaviour
             else if (Input.GetKeyDown(KeyCode.E))
             {
                 combatModeSystem.SetDefenceMode();
+                if (shieldSystem != null && shieldSystem.RechargeOnModeSwitchEnabled)
+                {
+                    shieldSystem.RechargeOnModeSwitch();
+                }
             }
         }
 
