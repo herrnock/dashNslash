@@ -9,9 +9,23 @@ public class PlayerAttackContactDamageSystem : MonoBehaviour
     [SerializeField] private CombatModeSystem combatModeSystem;
     [SerializeField] private float attackDamage = 10f;
     [SerializeField] private float damageCooldown = 1f;
-    [SerializeField] private HitFlashView hitFlashView; // Optional feedback
+    [SerializeField] private HealthSystem playerHealthSystem;
 
     private float lastDamageTime = -Mathf.Infinity;
+    private bool playerHealthWarningLogged = false;
+
+    private void Awake()
+    {
+        if (playerHealthSystem == null)
+        {
+            playerHealthSystem = GetComponent<HealthSystem>();
+            if (playerHealthSystem == null && !playerHealthWarningLogged)
+            {
+                Debug.LogWarning($"[PlayerAttackContactDamageSystem] No player HealthSystem assigned or found on {gameObject.name}.", this);
+                playerHealthWarningLogged = true;
+            }
+        }
+    }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
@@ -31,20 +45,51 @@ public class PlayerAttackContactDamageSystem : MonoBehaviour
         if (combatModeSystem == null || movementSystem == null)
             return;
 
+        // Strict valid Attack Dash condition
         if (combatModeSystem.Mode != CombatModeSystem.CombatMode.Attack)
             return;
-
         if (movementSystem.State != MovementSystem.MovementState.Moving)
             return;
+        if (!movementSystem.IsActivelyMoving)
+            return;
 
-        HealthSystem enemyHealth = other.GetComponent<HealthSystem>();
-        if (enemyHealth != null)
+        // Find enemy HealthSystem on root or parent
+        HealthSystem enemyHealth = other.GetComponentInParent<HealthSystem>();
+        if (enemyHealth == null)
+            return;
+
+        // Direction check: player must be moving toward enemy
+
+        UnityEngine.Vector3 playerPos = transform.position;
+        UnityEngine.Vector3 enemyPos = enemyHealth.transform.position;
+        Vector2 toEnemy = (enemyPos - playerPos).normalized;
+        Vector2 moveDir = movementSystem.LastMoveDirection;
+        if (moveDir == Vector2.zero)
+            return;
+        float dot = Vector2.Dot(moveDir, toEnemy);
+        if (dot <= 0.25f)
+            return;
+
+        // Guard check
+        EnemyGuardSystem guardSystem = enemyHealth.GetComponent<EnemyGuardSystem>();
+        if (guardSystem != null && guardSystem.BlocksAttackFrom(playerPos))
         {
-            enemyHealth.TakeDamage(attackDamage);
+            // Guard blocks: apply counter damage to player
+            if (playerHealthSystem != null)
+            {
+                playerHealthSystem.TakeDamage(guardSystem.CounterDamageOnAttackDash);
+            }
             lastDamageTime = Time.time;
-            // Play hit flash feedback if assigned
-            if (hitFlashView != null)
-                hitFlashView.PlayFlash();
+            return;
         }
+
+        // No guard block: damage enemy
+        enemyHealth.TakeDamage(attackDamage);
+        lastDamageTime = Time.time;
+
+        // Play enemy hit flash if present
+        HitFlashView hitFlash = enemyHealth.GetComponentInChildren<HitFlashView>();
+        if (hitFlash != null)
+            hitFlash.PlayFlash();
     }
 }

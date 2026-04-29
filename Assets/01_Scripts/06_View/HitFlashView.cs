@@ -33,6 +33,8 @@ public class HitFlashView : MonoBehaviour
         originalColor = spriteRenderer.color;
         spriteRenderer.color = flashColor;
         yield return new WaitForSeconds(flashDuration);
+        if (spriteRenderer == null)
+            yield break;
         spriteRenderer.color = originalColor;
         flashCoroutine = null;
     }
